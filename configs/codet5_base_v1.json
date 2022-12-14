@@ -1,0 +1,13 @@
+{
+    "model_name": "Salesforce/codet5-base",
+    "max_source_tokens_count": 512,
+    "max_target_tokens_count": 256,
+    "batch_size": 4,
+    "gradient_accumulation_steps": 4,
+    "logging_steps": 5,
+    "eval_steps": 25,
+    "save_steps": 25,
+    "warmup_steps": 25,
+    "num_train_epochs": 4,
+    "learning_rate": 0.0004
+}

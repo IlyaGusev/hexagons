@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import RegularPolygon
 
-colors_mapping = {
+COLORS_MAPPING = {
     0: "white",
     1: "black",
     2: "yellow",
@@ -17,7 +17,7 @@ colors_mapping = {
 def draw_board(colors):
     radius = 2.0 / 3.0
     vertical_step = radius * np.sqrt(3)
-    colors = [colors_mapping[c] for c in colors]
+    colors = [COLORS_MAPPING[c] for c in colors]
 
     # Horizontal cartesian coords
     hcoord = []

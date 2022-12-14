@@ -4,8 +4,9 @@ import torch
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-from hexagons.dataset import convert_to_t2t
-from hexagons.util import read_jsonl, gen_batch, set_random_seed
+from hexagons.board import COLORS_MAPPING
+from hexagons.dataset import read_records
+from hexagons.util import gen_batch, set_random_seed
 
 
 def predict(
@@ -16,7 +17,9 @@ def predict(
     batch_size,
     max_source_tokens_count,
     seed,
-    num_beams
+    num_beams,
+    is_zero_based,
+    use_color_strings
 ):
     set_random_seed(seed)
 
@@ -25,17 +28,13 @@ def predict(
         do_lower_case=False,
         truncation_side="left"
     )
-    raw_records = read_jsonl(input_file)
-    records = []
-    for example in raw_records:
-        records.extend(convert_to_t2t(example["drawing_procedure"]))
+    records = read_records(input_file, not is_zero_based, use_color_strings)
     if nrows:
         records = records[:nrows]
 
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = model.to(device)
-
 
     predictions = []
     for batch in tqdm(gen_batch(records, batch_size)):
@@ -57,6 +56,37 @@ def predict(
             prediction = tokenizer.decode(ids, skip_special_tokens=True)
             predictions.append(prediction)
 
+    em_correct = 0.0
+    em_all = 0.0
+    for r, pred in zip(records, predictions):
+        true_actions = r["actions"]
+        pred_actions = pred.split(" end")[0].split(",")
+        cleaned_pred_actions = []
+        for action in pred_actions:
+            try:
+                parts = tuple(action.split())
+                assert len(parts) == 3
+                cleaned_action = (
+                    int(parts[0]),
+                    int(parts[1]),
+                    int(parts[2]) if not use_color_strings else parts[2]
+                )
+                if use_color_strings:
+                    assert cleaned_action[2] in list(COLORS_MAPPING.values())
+                else:
+                    assert cleaned_action[2] < 8
+                assert cleaned_action[0] <= 10
+                assert cleaned_action[1] <= 18
+                cleaned_pred_actions.append(cleaned_action)
+            except Exception as e:
+                continue
+        pred_actions = cleaned_pred_actions
+        true_actions.sort()
+        pred_actions.sort()
+        em_correct += float(true_actions == pred_actions)
+        em_all += 1.0
+    print(em_correct/em_all)
+
     with open(output_file, "w") as w:
         for p in predictions:
             w.write(p.strip() + "\n")
@@ -69,8 +99,10 @@ if __name__ == "__main__":
     parser.add_argument("--nrows", type=int, default=None)
     parser.add_argument("--model-name", type=str, required=True)
     parser.add_argument("--batch-size", type=int, default=1)
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--seed", type=int, default=1337)
     parser.add_argument("--max-source-tokens-count", type=int, default=512)
     parser.add_argument("--num-beams", type=int, default=5)
+    parser.add_argument("--is-zero-based", action="store_true", default=False)
+    parser.add_argument("--use-color-strings", action="store_true", default=False)
     args = parser.parse_args()
     predict(**vars(args))

@@ -7,8 +7,8 @@ from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from transformers import Trainer, TrainingArguments, logging
 
-from hexagons.dataset import T2TDataset, convert_to_t2t
-from hexagons.util import read_jsonl, set_random_seed
+from hexagons.dataset import T2TDataset, read_records
+from hexagons.util import set_random_seed
 
 
 def train(
@@ -30,16 +30,12 @@ def train(
     model_name = config["model_name"]
     tokenizer = AutoTokenizer.from_pretrained(model_name, do_lower_case=False, truncation_side="left")
 
-    train_raw = read_jsonl(train_file)
-    train_records = []
-    for example in train_raw:
-        train_records.extend(convert_to_t2t(example["drawing_procedure"]))
+    is_one_based = config.get("is_one_based", True)
+    use_color_strings = config.get("use_color_strings", False)
+    train_records = read_records(train_file, is_one_based=is_one_based, use_color_strings=use_color_strings)
+    val_records = read_records(val_file, is_one_based=is_one_based, use_color_strings=use_color_strings)
     random.shuffle(train_records)
-
-    val_raw = read_jsonl(val_file)
-    val_records = []
-    for example in val_raw:
-        val_records.extend(convert_to_t2t(example["drawing_procedure"]))
+    print(train_records[0])
 
     max_source_tokens_count = config["max_source_tokens_count"]
     max_target_tokens_count = config["max_target_tokens_count"]

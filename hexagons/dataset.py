@@ -1,5 +1,5 @@
 import random
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -7,19 +7,32 @@ from torch.utils.data import Dataset
 from transformers import AutoTokenizer
 from tqdm import tqdm
 
+from hexagons.util import read_jsonl
+from hexagons.board import COLORS_MAPPING
 
-def calc_actions(state1, state2):
+
+def calc_actions(
+    state1: List[int],
+    state2: List[int],
+    is_one_based: bool,
+    use_color_strings: bool
+) -> List[Tuple]:
     actions = []
     for i, (c1, c2) in enumerate(zip(state1, state2)):
         if c1 == c2:
             continue
-        row_num = i // 18 + 1
-        col_num = i % 18 + 1
+        row_num = i // 18 + (1 if is_one_based else 0)
+        col_num = i % 18 + (1 if is_one_based else 0)
+        c2 = c2 if not use_color_strings else COLORS_MAPPING[c2]
         actions.append((row_num, col_num, c2))
     return actions
 
 
-def convert_to_t2t(procedure):
+def convert_to_t2t(
+    procedure: List[Tuple],
+    is_one_based: bool,
+    use_color_strings: bool
+):
     records = []
     input_template = "simplify instructions: {} simplified instructions: begin "
     prev_text = ""
@@ -28,7 +41,7 @@ def convert_to_t2t(procedure):
         instruction = step[1]
         state = step[2]
         if prev_state is not None:
-            actions = calc_actions(prev_state, state)
+            actions = calc_actions(prev_state, state, is_one_based, use_color_strings)
             source = input_template.format(instruction)
             target = " , ".join(["{} {} {}".format(*action) for action in actions])
             target += " end "
@@ -42,6 +55,18 @@ def convert_to_t2t(procedure):
             })
             prev_text = prev_text + source + target
         prev_state = state
+    return records
+
+
+def read_records(
+    file_name: str,
+    is_one_based: bool = True,
+    use_color_strings: bool = False
+) -> List[Dict]:
+    raw_records = read_jsonl(file_name)
+    records = []
+    for example in raw_records:
+        records.extend(convert_to_t2t(example["drawing_procedure"], is_one_based, use_color_strings))
     return records
 
 
