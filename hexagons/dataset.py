@@ -31,10 +31,10 @@ def calc_actions(
 def convert_to_t2t(
     procedure: List[Tuple],
     is_one_based: bool,
-    use_color_strings: bool
+    use_color_strings: bool,
+    input_template: str
 ):
     records = []
-    input_template = "simplify instructions: {} simplified instructions: begin "
     prev_text = ""
     prev_state = None
     for step in procedure:
@@ -61,12 +61,18 @@ def convert_to_t2t(
 def read_records(
     file_name: str,
     is_one_based: bool = True,
-    use_color_strings: bool = False
+    use_color_strings: bool = False,
+    input_template: str = None
 ) -> List[Dict]:
+    if input_template is None:
+        input_template = "simplify instructions: {} simplified instructions: begin "
     raw_records = read_jsonl(file_name)
     records = []
     for example in raw_records:
-        records.extend(convert_to_t2t(example["drawing_procedure"], is_one_based, use_color_strings))
+        records.extend(convert_to_t2t(
+            example["drawing_procedure"], is_one_based,
+            use_color_strings, input_template
+        ))
     return records
 
 
@@ -105,6 +111,14 @@ class T2TDataset(Dataset):
     def __getitem__(self, index):
         return self.records[index]
 
+    def convert_pair(self, text, summary):
+        raise NotImplementedError
+
+
+class T2TSeq2SeqDataset(T2TDataset):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     def convert_pair(self, source, target):
         inputs = self.tokenizer(
             source,
@@ -128,3 +142,44 @@ class T2TDataset(Dataset):
             labels[outputs["attention_mask"].squeeze(0) == 0] = -100
             inputs["labels"] = labels
         return inputs
+
+
+class T2TLMDataset(T2TDataset):
+    def __init__(self, *args, only_target_loss = True, **kwargs):
+        self.only_target_loss = only_target_loss
+        super().__init__(*args, **kwargs)
+
+    def convert_pair(self, source, target):
+        source_tokens = self.tokenizer(
+            source,
+            add_special_tokens=False,
+            max_length=self.max_source_tokens_count,
+            padding=False,
+            truncation=True
+        )["input_ids"]
+        input_ids = source_tokens + [self.tokenizer.sep_token_id]
+        if target is not None:
+            target_tokens = self.tokenizer(
+                target,
+                add_special_tokens=False,
+                max_length=self.max_target_tokens_count,
+                padding=False,
+                truncation=True
+            )["input_ids"]
+            input_ids += target_tokens + [self.tokenizer.eos_token_id]
+            max_length = self.max_source_tokens_count + self.max_target_tokens_count + 2
+            padding = [self.tokenizer.pad_token_id for i in range(len(input_ids), max_length)]
+            input_ids.extend(padding)
+        input_ids = torch.LongTensor(input_ids)
+        labels = input_ids.clone()
+        labels[labels == self.tokenizer.pad_token_id] = -100
+        if self.only_target_loss:
+            for i in range(len(source_tokens) + 1):
+                labels[i] = -100
+        attention_mask = (input_ids != self.tokenizer.pad_token_id).long()
+        return {
+            "input_ids": input_ids,
+            "labels": labels,
+            "attention_mask": attention_mask
+        }
+

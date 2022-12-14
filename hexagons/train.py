@@ -4,11 +4,21 @@ import json
 
 import torch
 from tqdm import tqdm
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, AutoModelForCausalLM
 from transformers import Trainer, TrainingArguments, logging
 
-from hexagons.dataset import T2TDataset, read_records
-from hexagons.util import set_random_seed
+from hexagons.dataset import T2TSeq2SeqDataset, T2TLMDataset, read_records
+from hexagons.util import set_random_seed, fix_tokenizer, fix_model
+
+dataset_classes = {
+    "seq2seq": T2TSeq2SeqDataset,
+    "causal": T2TLMDataset
+}
+
+model_classes = {
+    "seq2seq": AutoModelForSeq2SeqLM,
+    "causal": AutoModelForCausalLM
+}
 
 
 def train(
@@ -28,34 +38,50 @@ def train(
         config = json.load(r)
 
     model_name = config["model_name"]
+    model_type = config.get("model_type", "seq2seq")
     tokenizer = AutoTokenizer.from_pretrained(model_name, do_lower_case=False, truncation_side="left")
+    if model_type == "causal":
+        tokenizer = fix_tokenizer(tokenizer)
 
     is_one_based = config.get("is_one_based", True)
     use_color_strings = config.get("use_color_strings", False)
-    train_records = read_records(train_file, is_one_based=is_one_based, use_color_strings=use_color_strings)
-    val_records = read_records(val_file, is_one_based=is_one_based, use_color_strings=use_color_strings)
+    input_template = config.get("input_template", None)
+    train_records = read_records(
+        train_file,
+        is_one_based=is_one_based,
+        use_color_strings=use_color_strings,
+        input_template=input_template
+    )
+    val_records = read_records(
+        val_file,
+        is_one_based=is_one_based,
+        use_color_strings=use_color_strings,
+        input_template=input_template
+    )
     random.shuffle(train_records)
     print(train_records[0])
 
     max_source_tokens_count = config["max_source_tokens_count"]
     max_target_tokens_count = config["max_target_tokens_count"]
-    train_dataset = T2TDataset(
+    dataset_class = dataset_classes[model_type]
+    train_dataset = dataset_class(
         train_records,
         tokenizer,
         max_source_tokens_count=max_source_tokens_count,
         max_target_tokens_count=max_target_tokens_count
     )
+    print(train_dataset[0])
 
-    val_dataset = T2TDataset(
+    val_dataset = dataset_class(
         val_records,
         tokenizer,
         max_source_tokens_count=max_source_tokens_count,
         max_target_tokens_count=max_target_tokens_count
     )
 
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-    model.config.num_beams = 5
-    model.config.max_length = max_target_tokens_count
+    model_class = model_classes[model_type]
+    model = model_class.from_pretrained(model_name)
+    model = fix_model(model, tokenizer, model_type, max_target_tokens_count)
 
     training_args = TrainingArguments(
         output_dir=output_dir,

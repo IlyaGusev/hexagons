@@ -19,7 +19,8 @@ def predict(
     seed,
     num_beams,
     is_zero_based,
-    use_color_strings
+    use_color_strings,
+    input_template
 ):
     set_random_seed(seed)
 
@@ -28,7 +29,12 @@ def predict(
         do_lower_case=False,
         truncation_side="left"
     )
-    records = read_records(input_file, not is_zero_based, use_color_strings)
+    records = read_records(
+        input_file,
+        not is_zero_based,
+        use_color_strings,
+        input_template=input_template
+    )
     if nrows:
         records = records[:nrows]
 
@@ -104,5 +110,6 @@ if __name__ == "__main__":
     parser.add_argument("--num-beams", type=int, default=5)
     parser.add_argument("--is-zero-based", action="store_true", default=False)
     parser.add_argument("--use-color-strings", action="store_true", default=False)
+    parser.add_argument("--input-template", type=str, default="instructions: {} commands: ")
     args = parser.parse_args()
     predict(**vars(args))
