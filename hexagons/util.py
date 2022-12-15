@@ -93,8 +93,4 @@ def fix_model(model, tokenizer, model_type, max_target_tokens_count):
                 break
         assert model.config.eos_token_id is not None
         model.resize_token_embeddings(len(tokenizer))
-
-    # Default model generation params
-    model.config.num_beams = 5
-    model.config.max_length = max_target_tokens_count
     return model

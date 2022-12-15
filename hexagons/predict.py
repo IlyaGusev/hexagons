@@ -7,6 +7,7 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from hexagons.board import COLORS_MAPPING
 from hexagons.dataset import read_records
 from hexagons.util import gen_batch, set_random_seed
+from hexagons.common import MODEL_CLASSES
 
 
 def predict(
@@ -16,6 +17,7 @@ def predict(
     output_file,
     batch_size,
     max_source_tokens_count,
+    model_type,
     seed,
     num_beams,
     is_zero_based,
@@ -38,28 +40,48 @@ def predict(
     if nrows:
         records = records[:nrows]
 
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    model = MODEL_CLASSES[model_type].from_pretrained(model_name)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = model.to(device)
 
     predictions = []
-    for batch in tqdm(gen_batch(records, batch_size)):
-        texts = [r["source"] for r in batch]
-        input_ids = tokenizer(
-            texts,
-            add_special_tokens=True,
-            max_length=max_source_tokens_count,
-            padding="max_length",
-            truncation=True,
-            return_tensors="pt",
-        )["input_ids"].to(device)
-        output_ids = model.generate(
-            input_ids=input_ids,
-            num_beams=num_beams
-        )
+    if model_type == "seq2seq":
+        for batch in tqdm(gen_batch(records, batch_size)):
+            texts = [r["source"] for r in batch]
+            input_ids = tokenizer(
+                texts,
+                add_special_tokens=True,
+                max_length=max_source_tokens_count,
+                padding="max_length",
+                truncation=True,
+                return_tensors="pt",
+            )["input_ids"].to(device)
+            output_ids = model.generate(
+                input_ids=input_ids,
+                num_beams=num_beams
+            )
 
-        for ids in output_ids:
-            prediction = tokenizer.decode(ids, skip_special_tokens=True)
+            for ids in output_ids:
+                prediction = tokenizer.decode(ids, skip_special_tokens=True)
+                predictions.append(prediction)
+    else:
+        for r in tqdm(records):
+            text_tokens = tokenizer(
+                r["source"],
+                add_special_tokens=False,
+                max_length=max_source_tokens_count,
+                padding=False,
+                truncation=True
+            )["input_ids"]
+            input_ids = text_tokens + [tokenizer.sep_token_id]
+            input_ids = torch.LongTensor([input_ids]).to(device)
+            output_ids = model.generate(
+                input_ids=input_ids,
+                num_beams=num_beams,
+                max_new_tokens=256
+            )
+            prediction = tokenizer.decode(output_ids[0], skip_special_tokens=False)
+            prediction = prediction.split(tokenizer.sep_token)[1].split(tokenizer.eos_token)[0]
             predictions.append(prediction)
 
     em_correct = 0.0
@@ -104,6 +126,7 @@ if __name__ == "__main__":
     parser.add_argument("--output-file", type=str, required=True)
     parser.add_argument("--nrows", type=int, default=None)
     parser.add_argument("--model-name", type=str, required=True)
+    parser.add_argument("--model-type", type=str, default="seq2seq", choices=("seq2seq", "causal"))
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--seed", type=int, default=1337)
     parser.add_argument("--max-source-tokens-count", type=int, default=512)

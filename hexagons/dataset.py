@@ -183,3 +183,8 @@ class T2TLMDataset(T2TDataset):
             "attention_mask": attention_mask
         }
 
+
+DATASET_CLASSES = {
+    "seq2seq": T2TSeq2SeqDataset,
+    "causal": T2TLMDataset
+}

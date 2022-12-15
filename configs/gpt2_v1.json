@@ -1,5 +1,6 @@
 {
-    "model_name": "google/t5-base-lm-adapt",
+    "model_name": "gpt2",
+    "model_type": "causal",
     "max_source_tokens_count": 512,
     "max_target_tokens_count": 256,
     "batch_size": 2,

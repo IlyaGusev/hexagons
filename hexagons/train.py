@@ -7,18 +7,9 @@ from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, AutoModelForCausalLM
 from transformers import Trainer, TrainingArguments, logging
 
-from hexagons.dataset import T2TSeq2SeqDataset, T2TLMDataset, read_records
+from hexagons.dataset import DATASET_CLASSES, read_records
 from hexagons.util import set_random_seed, fix_tokenizer, fix_model
-
-dataset_classes = {
-    "seq2seq": T2TSeq2SeqDataset,
-    "causal": T2TLMDataset
-}
-
-model_classes = {
-    "seq2seq": AutoModelForSeq2SeqLM,
-    "causal": AutoModelForCausalLM
-}
+from hexagons.common import MODEL_CLASSES
 
 
 def train(
@@ -63,7 +54,7 @@ def train(
 
     max_source_tokens_count = config["max_source_tokens_count"]
     max_target_tokens_count = config["max_target_tokens_count"]
-    dataset_class = dataset_classes[model_type]
+    dataset_class = DATASET_CLASSES[model_type]
     train_dataset = dataset_class(
         train_records,
         tokenizer,
@@ -79,9 +70,14 @@ def train(
         max_target_tokens_count=max_target_tokens_count
     )
 
-    model_class = model_classes[model_type]
+    model_class = MODEL_CLASSES[model_type]
     model = model_class.from_pretrained(model_name)
     model = fix_model(model, tokenizer, model_type, max_target_tokens_count)
+
+    # Default model generation params
+    model.config.num_beams = 5
+    max_tokens_count = max_target_tokens_count + max_source_tokens_count
+    model.config.max_length = max_target_tokens_count if model_type == "seq2seq" else max_tokens_count
 
     training_args = TrainingArguments(
         output_dir=output_dir,
