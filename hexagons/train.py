@@ -1,6 +1,7 @@
 import argparse
 import random
 import json
+import os
 
 import torch
 from tqdm import tqdm
@@ -10,6 +11,8 @@ from transformers import Trainer, TrainingArguments, logging
 from hexagons.dataset import DATASET_CLASSES, read_records
 from hexagons.util import set_random_seed, fix_tokenizer, fix_model
 from hexagons.common import MODEL_CLASSES
+
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
 def train(
@@ -21,7 +24,8 @@ def train(
     val_sample_rate,
     output_dir,
     report_to,
-    seed
+    seed,
+    local_rank
 ):
     set_random_seed(seed)
     logging.set_verbosity_info()
@@ -79,6 +83,9 @@ def train(
     max_tokens_count = max_target_tokens_count + max_source_tokens_count
     model.config.max_length = max_target_tokens_count if model_type == "seq2seq" else max_tokens_count
 
+    deepspeed_config = config.get("deepspeed")
+    if deepspeed_config:
+        deepspeed_config["train_batch_size"] = config["batch_size"] * config["gradient_accumulation_steps"]
     training_args = TrainingArguments(
         output_dir=output_dir,
         per_device_train_batch_size=config["batch_size"],
@@ -93,7 +100,9 @@ def train(
         evaluation_strategy="steps",
         save_total_limit=1,
         load_best_model_at_end=True,
-        report_to=report_to
+        report_to=report_to,
+        fp16=True,
+        deepspeed=deepspeed_config
     )
 
     trainer = Trainer(
@@ -118,5 +127,6 @@ if __name__ == "__main__":
     parser.add_argument("--val-sample-rate", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--report-to", type=str, default="none")
+    parser.add_argument("--local_rank", type=int, default=0)
     args = parser.parse_args()
     train(**vars(args))
