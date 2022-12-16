@@ -51,10 +51,10 @@ def fix_tokenizer(tokenizer):
     if tokenizer.sep_token_id in (None, tokenizer.vocab_size) and "bos_token" in special_tokens:
         special_tokens["sep_token"] = special_tokens["bos_token"]
 
-    if "pad_token" not in special_tokens or not special_tokens["pad_token"]:
+    if tokenizer.pad_token_id in (None, tokenizer.vocab_size) and "pad_token" not in special_tokens:
         special_tokens["pad_token"] = "<|pad|>"
 
-    if "sep_token" not in special_tokens or not pecial_tokens["sep_token"]:
+    if tokenizer.sep_token_id in (None, tokenizer.vocab_size) and "sep_token" not in special_tokens:
         special_tokens["sep_token"] = "<|sep|>"
 
     tokenizer.add_special_tokens(special_tokens)
