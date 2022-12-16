@@ -14,17 +14,24 @@ from hexagons.util import read_jsonl
 
 
 def complete(prompt):
-    response = openai.Completion.create(
-        model="code-davinci-002",
-        prompt=prompt,
-        temperature=0.1,
-        max_tokens=256,
-        top_p=1,
-        best_of=5,
-        frequency_penalty=0,
-        presence_penalty=0,
-        stop=["#"]
-    )
+    while True:
+        try:
+            response = openai.Completion.create(
+                model="code-davinci-002",
+                prompt=prompt,
+                temperature=0.1,
+                max_tokens=256,
+                top_p=1,
+                best_of=5,
+                frequency_penalty=0,
+                presence_penalty=0,
+                stop=["#"]
+            )
+            break
+        except openai.error.RateLimitError as e:
+            print("Rate limit error! Retrying...")
+            sleep(60)
+            continue
     target = response["choices"][0]["text"]
     full_program = prompt + target
     return full_program
@@ -40,6 +47,7 @@ args = parser.parse_args()
 input_file = args.input_file
 output_file = args.output_file
 prompt_file = args.prompt_file
+delay_sec = 20
 
 with open(prompt_file) as r:
     original_prompt = r.read().strip()
@@ -75,14 +83,14 @@ for example in raw_records:
         except Exception as e:
             traceback.print_exc()
             print(correct_cnt, all_cnt, correct_cnt/all_cnt)
-            sleep(15)
+            sleep(delay_sec)
             output_records.append(output_record)
             continue
         correct_cnt += float(true_actions == pred_actions)
         print(correct_cnt, all_cnt, correct_cnt/all_cnt)
         program += "\n# Cleaning\ngrid.clean_actions()\n"
         prompt = program + "\n#"
-        sleep(15)
+        sleep(delay_sec)
         prev_state = state
         output_records.append(output_record)
 with open(output_file, "w") as w:
