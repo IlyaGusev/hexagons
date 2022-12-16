@@ -17,6 +17,7 @@ def predict(
     output_file,
     batch_size,
     max_source_tokens_count,
+    max_target_tokens_count,
     model_type,
     seed,
     num_beams,
@@ -58,7 +59,8 @@ def predict(
             )["input_ids"].to(device)
             output_ids = model.generate(
                 input_ids=input_ids,
-                num_beams=num_beams
+                num_beams=num_beams,
+                max_length=max_target_tokens_count
             )
 
             for ids in output_ids:
@@ -78,7 +80,7 @@ def predict(
             output_ids = model.generate(
                 input_ids=input_ids,
                 num_beams=num_beams,
-                max_new_tokens=256
+                max_new_tokens=max_target_tokens_count
             )
             prediction = tokenizer.decode(output_ids[0], skip_special_tokens=False)
             prediction = prediction.split(tokenizer.sep_token)[1].split(tokenizer.eos_token)[0]
@@ -130,6 +132,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--seed", type=int, default=1337)
     parser.add_argument("--max-source-tokens-count", type=int, default=512)
+    parser.add_argument("--max-target-tokens-count", type=int, default=256)
     parser.add_argument("--num-beams", type=int, default=5)
     parser.add_argument("--is-zero-based", action="store_true", default=False)
     parser.add_argument("--use-color-strings", action="store_true", default=False)

@@ -52,10 +52,10 @@ def fix_tokenizer(tokenizer):
         special_tokens["sep_token"] = special_tokens["bos_token"]
 
     if "pad_token" not in special_tokens or not special_tokens["pad_token"]:
-        special_tokens["pad_token"] = "<pad>"
+        special_tokens["pad_token"] = "<|pad|>"
 
     if "sep_token" not in special_tokens or not pecial_tokens["sep_token"]:
-        special_tokens["sep_token"] = "<sep>"
+        special_tokens["sep_token"] = "<|sep|>"
 
     tokenizer.add_special_tokens(special_tokens)
 
@@ -69,28 +69,28 @@ def fix_tokenizer(tokenizer):
 
 
 def fix_model(model, tokenizer, model_type, max_target_tokens_count):
-    if model_type == "causal":
-        model.config.pad_token_id = tokenizer.pad_token_id
-        assert model.config.pad_token_id is not None
+    model.config.pad_token_id = tokenizer.pad_token_id
+    assert model.config.pad_token_id is not None
 
-        bos_candidates = (
-            tokenizer.bos_token_id,
-            tokenizer.cls_token_id,
-            tokenizer.sep_token_id,
-            tokenizer.unk_token_id
-        )
-        for bos_candidate in bos_candidates:
-            model.config.bos_token_id = bos_candidate
-            if bos_candidate is not None:
-                break
-        assert model.config.bos_token_id is not None
-        model.config.decoder_start_token_id = model.config.bos_token_id
+    bos_candidates = (
+        tokenizer.bos_token_id,
+        tokenizer.cls_token_id,
+        tokenizer.sep_token_id,
+        tokenizer.unk_token_id
+    )
+    for bos_candidate in bos_candidates:
+        model.config.bos_token_id = bos_candidate
+        if bos_candidate is not None:
+            break
+    assert model.config.bos_token_id is not None
+    model.config.decoder_start_token_id = model.config.bos_token_id
 
-        eos_candidates = (tokenizer.eos_token_id, tokenizer.sep_token_id)
-        for eos_candidate in eos_candidates:
-            model.config.eos_token_id = eos_candidate
-            if eos_candidate is not None:
-                break
-        assert model.config.eos_token_id is not None
-        model.resize_token_embeddings(len(tokenizer))
+    eos_candidates = (tokenizer.eos_token_id, tokenizer.sep_token_id)
+    for eos_candidate in eos_candidates:
+        model.config.eos_token_id = eos_candidate
+        if eos_candidate is not None:
+            break
+    assert model.config.eos_token_id is not None
+    model.resize_token_embeddings(len(tokenizer))
+
     return model

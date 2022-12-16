@@ -1,24 +1,28 @@
 {
     "model_name": "allenai/bhaskara",
     "model_type": "causal",
-    "max_source_tokens_count": 320,
-    "max_target_tokens_count": 96,
-    "batch_size": 3,
+    "max_source_tokens_count": 512,
+    "max_target_tokens_count": 256,
+    "batch_size": 2,
     "gradient_accumulation_steps": 3,
     "logging_steps": 10,
-    "eval_steps": 50,
-    "save_steps": 50,
-    "warmup_steps": 50,
-    "num_train_epochs": 4,
-    "learning_rate": 0.0004,
+    "eval_steps": 100,
+    "save_steps": 100,
+    "warmup_steps": 100,
+    "num_train_epochs": 5,
+    "learning_rate": 0.00005,
     "is_one_based": true,
     "use_color_strings": true,
     "input_template": "instructions: {} commands: ",
+    "fp16": true,
     "deepspeed": {
         "fp16": {
             "enabled": true,
-            "min_loss_scale": 1,
-            "opt_level": "O3"
+            "loss_scale": 0,
+            "loss_scale_window": 1000,
+            "initial_scale_power": 16,
+            "hysteresis": 2,
+            "min_loss_scale": 1
         },
         "zero_optimization": {
             "stage": 3,
@@ -30,8 +34,11 @@
                 "device": "cpu",
                 "pin_memory": true
             },
+            "overlap_comm": true,
             "contiguous_gradients": true,
             "stage3_gather_fp16_weights_on_model_save": true
-        }
+        },
+        "train_batch_size": "auto",
+        "gradient_accumulation_steps": "auto"
     }
 }

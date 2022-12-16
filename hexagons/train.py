@@ -34,9 +34,11 @@ def train(
 
     model_name = config["model_name"]
     model_type = config.get("model_type", "seq2seq")
-    tokenizer = AutoTokenizer.from_pretrained(model_name, do_lower_case=False, truncation_side="left")
-    if model_type == "causal":
-        tokenizer = fix_tokenizer(tokenizer)
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_name,
+        truncation_side="left"
+    )
+    tokenizer = fix_tokenizer(tokenizer)
 
     is_one_based = config.get("is_one_based", True)
     use_color_strings = config.get("use_color_strings", False)
@@ -82,10 +84,9 @@ def train(
     model.config.num_beams = 5
     max_tokens_count = max_target_tokens_count + max_source_tokens_count
     model.config.max_length = max_target_tokens_count if model_type == "seq2seq" else max_tokens_count
+    model.config.max_new_tokens = max_target_tokens_count
 
     deepspeed_config = config.get("deepspeed")
-    if deepspeed_config:
-        deepspeed_config["train_batch_size"] = config["batch_size"] * config["gradient_accumulation_steps"]
     training_args = TrainingArguments(
         output_dir=output_dir,
         per_device_train_batch_size=config["batch_size"],
@@ -101,7 +102,7 @@ def train(
         save_total_limit=1,
         load_best_model_at_end=True,
         report_to=report_to,
-        fp16=True,
+        fp16=config.get("fp16", False),
         deepspeed=deepspeed_config
     )
 
@@ -112,8 +113,8 @@ def train(
         eval_dataset=val_dataset
     )
     trainer.train()
-    model.save_pretrained(output_dir)
     tokenizer.save_pretrained(output_dir)
+    model.save_pretrained(output_dir)
 
 
 if __name__ == "__main__":
