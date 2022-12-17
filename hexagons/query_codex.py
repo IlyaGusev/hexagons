@@ -13,7 +13,7 @@ from hexagons.board import COLORS_MAPPING
 from hexagons.util import read_jsonl
 
 
-def complete(prompt):
+def codex_predict(prompt):
     while True:
         try:
             response = openai.Completion.create(
@@ -41,13 +41,14 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 parser = argparse.ArgumentParser()
 parser.add_argument("input_file", type=str)
 parser.add_argument("output_file", type=str)
+parser.add_argument("--delay-sec", type=int, default=20)
 parser.add_argument("--prompt-file", type=str, required=True)
 args = parser.parse_args()
 
 input_file = args.input_file
 output_file = args.output_file
 prompt_file = args.prompt_file
-delay_sec = 20
+delay_sec = args.delay_sec
 
 with open(prompt_file) as r:
     original_prompt = r.read().strip()
@@ -74,7 +75,7 @@ for example in raw_records:
         true_actions = calc_actions(prev_state, state, True, True)
         output_record["true_actions"] = true_actions
         prompt += " " + instruction + "\n"
-        program = complete(prompt)
+        program = codex_predict(prompt)
         try:
             output_record["program"] = program
             exec(program)

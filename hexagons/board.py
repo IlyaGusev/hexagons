@@ -2,17 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import RegularPolygon
 
-COLORS_MAPPING = {
-    0: "white",
-    1: "black",
-    2: "yellow",
-    3: "green",
-    4: "red",
-    5: "blue",
-    6: "purple",
-    7: "orange"
-}
-
+COLORS_MAPPING = ["white", "black", "yellow", "green", "red", "blue", "purple", "orange"]
+COLOR2INDEX = {color: i for i, color in enumerate(COLORS_MAPPING)}
 
 def draw_board(colors):
     radius = 2.0 / 3.0

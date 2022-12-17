@@ -1,5 +1,5 @@
 import random
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any
 
 import torch
 import torch.nn.functional as F
@@ -8,14 +8,14 @@ from transformers import AutoTokenizer
 from tqdm import tqdm
 
 from hexagons.util import read_jsonl
-from hexagons.board import COLORS_MAPPING
+from hexagons.board import COLORS_MAPPING, COLOR2INDEX
 
 
 def calc_actions(
     state1: List[int],
     state2: List[int],
-    is_one_based: bool,
-    use_color_strings: bool
+    is_one_based: bool = True,
+    use_color_strings: bool = True
 ) -> List[Tuple]:
     actions = []
     for i, (c1, c2) in enumerate(zip(state1, state2)):
@@ -28,8 +28,23 @@ def calc_actions(
     return actions
 
 
+def apply_actions(
+    state: List[int],
+    actions: List[Tuple],
+    is_one_based: bool = True,
+    use_color_strings: bool = True
+) -> List[int]:
+    for row_num, col_num, color in actions:
+        if is_one_based:
+            row_num -=1
+            col_num -=1
+        index = row_num * 18 + col_num
+        state[index] = color if not use_color_strings else COLOR2INDEX[color]
+    return state
+
+
 def convert_to_t2t(
-    procedure: List[Tuple],
+    example: Dict[str, Any],
     is_one_based: bool,
     use_color_strings: bool,
     input_template: str
@@ -37,7 +52,9 @@ def convert_to_t2t(
     records = []
     prev_text = ""
     prev_state = None
-    for step in procedure:
+    index = example["index"]
+    procedure = example["drawing_procedure"]
+    for step_num, step in enumerate(procedure):
         instruction = step[1]
         state = step[2]
         if prev_state is not None:
@@ -46,6 +63,8 @@ def convert_to_t2t(
             target = " , ".join(["{} {} {}".format(*action) for action in actions])
             target += " end "
             records.append({
+                "index": index,
+                "step_num": step_num,
                 "source": prev_text + source,
                 "target": target,
                 "instruction": instruction,
@@ -70,9 +89,10 @@ def read_records(
     records = []
     for example in raw_records:
         records.extend(convert_to_t2t(
-            example["drawing_procedure"], is_one_based,
+            example, is_one_based,
             use_color_strings, input_template
         ))
+    records.sort(key=lambda x: (x["index"], x["step_num"]))
     return records
 
 

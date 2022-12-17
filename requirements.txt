@@ -2,3 +2,4 @@ torch
 transformers
 transformers[deepspeed]
 matplotlib
+scikit-learn

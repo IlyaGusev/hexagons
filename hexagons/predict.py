@@ -4,8 +4,9 @@ import torch
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
+from hexagons.metrics import Metrics
 from hexagons.board import COLORS_MAPPING
-from hexagons.dataset import read_records
+from hexagons.dataset import read_records, apply_actions
 from hexagons.util import gen_batch, set_random_seed
 from hexagons.common import MODEL_CLASSES
 
@@ -86,15 +87,14 @@ def predict(
             prediction = prediction.split(tokenizer.sep_token)[1].split(tokenizer.eos_token)[0]
             predictions.append(prediction)
 
-    em_correct = 0.0
-    em_all = 0.0
+    metrics = Metrics()
+    cur_index = None
     for r, pred in zip(records, predictions):
-        true_actions = r["actions"]
         pred_actions = pred.split(" end")[0].split(",")
         cleaned_pred_actions = []
         for action in pred_actions:
             try:
-                parts = tuple(action.split())
+                parts = tuple(action.strip().split())
                 assert len(parts) == 3
                 cleaned_action = (
                     int(parts[0]),
@@ -102,7 +102,7 @@ def predict(
                     int(parts[2]) if not use_color_strings else parts[2]
                 )
                 if use_color_strings:
-                    assert cleaned_action[2] in list(COLORS_MAPPING.values())
+                    assert cleaned_action[2] in COLORS_MAPPING
                 else:
                     assert cleaned_action[2] < 8
                 assert cleaned_action[0] <= 10
@@ -111,11 +111,19 @@ def predict(
             except Exception as e:
                 continue
         pred_actions = cleaned_pred_actions
-        true_actions.sort()
-        pred_actions.sort()
-        em_correct += float(true_actions == pred_actions)
-        em_all += 1.0
-    print(em_correct/em_all)
+
+        true_actions = r["actions"]
+        index = r["index"]
+        true_state = r["state"]
+        if cur_index != index:
+            cur_state = apply_actions(r["prev_state"], pred_actions)
+            cur_index = index
+        else:
+            cur_state = apply_actions(cur_state, pred_actions)
+
+        metrics.add(true_actions, pred_actions, true_state, cur_state)
+
+    metrics.print_all()
 
     with open(output_file, "w") as w:
         for p in predictions:

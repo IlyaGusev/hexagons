@@ -1,0 +1,41 @@
+{
+    "model_name": "EleutherAI/gpt-neo-2.7B",
+    "model_type": "causal",
+    "max_source_tokens_count": 512,
+    "max_target_tokens_count": 256,
+    "batch_size": 2,
+    "gradient_accumulation_steps": 3,
+    "logging_steps": 10,
+    "eval_steps": 100,
+    "save_steps": 100,
+    "warmup_steps": 100,
+    "num_train_epochs": 5,
+    "learning_rate": 0.00004,
+    "is_one_based": true,
+    "use_color_strings": true,
+    "input_template": "instructions: {} commands: ",
+    "fp16": true,
+    "deepspeed": {
+        "fp16": {
+            "enabled": true,
+            "min_loss_scale": 0.01,
+            "opt_level": "O2"
+        },
+        "zero_optimization": {
+            "stage": 3,
+            "offload_param": {
+                "device": "cpu",
+                "pin_memory": true
+            },
+            "offload_optimizer": {
+                "device": "cpu",
+                "pin_memory": true
+            },
+            "overlap_comm": true,
+            "contiguous_gradients": true,
+            "stage3_gather_fp16_weights_on_model_save": true
+        },
+        "train_batch_size": "auto",
+        "gradient_accumulation_steps": "auto"
+    }
+}
