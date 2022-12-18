@@ -7,8 +7,10 @@ from typing import List, Tuple
 from time import sleep
 
 import openai
+from tqdm import tqdm
 
-from hexagons.dataset import calc_actions
+from hexagons.metrics import Metrics
+from hexagons.dataset import calc_actions, apply_actions
 from hexagons.board import COLORS_MAPPING
 from hexagons.util import read_jsonl
 
@@ -53,12 +55,14 @@ delay_sec = args.delay_sec
 with open(prompt_file) as r:
     original_prompt = r.read().strip()
 
+metrics = Metrics()
 raw_records = read_jsonl(input_file)
-correct_cnt, all_cnt = 0.0, 0.0
 output_records = []
-for example in raw_records:
+for example in tqdm(raw_records):
+    index = example["index"]
     procedure = example["drawing_procedure"]
     prev_state = None
+    cur_state = None
     prompt = original_prompt
     for step in procedure:
         instruction, state = step[1], step[2]
@@ -70,8 +74,8 @@ for example in raw_records:
         instruction = " ".join(instruction.split())
         if prev_state is None:
             prev_state = state
+            cur_state = state
             continue
-        all_cnt += 1.0
         true_actions = calc_actions(prev_state, state, True, True)
         output_record["true_actions"] = true_actions
         prompt += " " + instruction + "\n"
@@ -80,22 +84,23 @@ for example in raw_records:
             output_record["program"] = program
             exec(program)
             pred_actions = grid.get_actions()
-            output_record["pred_actions"] = pred_actions
+            program += "\n# Cleaning\ngrid.clean_actions()\n"
+            prompt = program + "\n#"
         except Exception as e:
             traceback.print_exc()
-            print(correct_cnt, all_cnt, correct_cnt/all_cnt)
-            sleep(delay_sec)
-            output_records.append(output_record)
-            continue
-        correct_cnt += float(true_actions == pred_actions)
-        print(correct_cnt, all_cnt, correct_cnt/all_cnt)
-        program += "\n# Cleaning\ngrid.clean_actions()\n"
-        prompt = program + "\n#"
+            pred_actions = []
+
+        output_record["pred_actions"] = pred_actions
+        cur_state = apply_actions(cur_state, pred_actions)
+        metrics.add(true_actions, pred_actions, state, cur_state)
         sleep(delay_sec)
         prev_state = state
         output_records.append(output_record)
+        metrics.print_all()
+
+metrics.print_all()
+
 with open(output_file, "w") as w:
     for r in output_records:
         w.write(json.dumps(r, ensure_ascii=False).strip() + "\n")
-print(correct_cnt, all_cnt, correct_cnt/all_cnt)
 
