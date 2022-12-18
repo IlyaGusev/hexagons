@@ -9,7 +9,9 @@ class HexagonalGrid:
         self.actions_log = []
 
     def paint_cell(self, row, col, color):
-        assert color in COLORS
+        assert color in COLORS, f"Wrong color: {color}"
+        assert 1 <= row <= 10, f"Wrong row index: {row}"
+        assert 1 <= col <= 18, f"Wrong col index: {col}"
         self.actions_log.append((row, col, color))
         self.grid[row][col] = COLORS.index(color)
 
