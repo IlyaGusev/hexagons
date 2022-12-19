@@ -1,4 +1,6 @@
 import os
+from time import sleep
+
 import openai
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -7,9 +9,9 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 def codex_predict(prompt, **kwargs):
     request_kwargs = {
         "temperature": 0.1,
-        "max_tokens": 256,
+        "max_tokens": 512,
         "top_p": 1,
-        "best_of": 5,
+        "best_of": 3,
         "frequency_penalty": 0,
         "stop": ["#"]
     }
